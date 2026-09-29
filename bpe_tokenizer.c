@@ -20,6 +20,23 @@
 #define TOKEN_COUNT 128
 #define PAIR_COUNT (TOKEN_COUNT * TOKEN_COUNT)
 
+/*
+ * Atomic act-marker tokens (G1): grammar atoms of the record format,
+ * matched greedily BEFORE byte splitting.  They are reserved, never learned
+ * merges, and never participate in merge scoring (ids >= BASE_TOKENS are
+ * skipped by the merge trainer).  Ordered longest-first so the matcher is
+ * greedy without ambiguity.
+ */
+#define ATOM_COUNT 5
+static const char *ATOM_STRINGS[ATOM_COUNT] = {
+    "<CHANNEL:", /* 128 */
+    "<SUMMARY>", /* 129 */
+    "<END>",     /* 130 */
+    "[Z>A",      /* 131 */
+    "[A",        /* 132 */
+};
+static unsigned long long atom_counts[ATOM_COUNT] = {0};
+
 typedef uint16_t Token;
 
 typedef struct {
@@ -343,6 +360,39 @@ static void clean_editorial_noise(unsigned char *data, size_t *length,
     *length = write;
 }
 
+/*
+ * Replace atomic act-marker byte-runs with their reserved token ids.
+ * In-place compaction: output is never longer than input.  Longest-first
+ * table order guarantees greedy matching without ambiguity.
+ */
+static void apply_atoms(unsigned char *data, size_t *length)
+{
+    size_t read = 0;
+    size_t write = 0;
+    while (read < *length) {
+        int matched = -1;
+        size_t mlen = 0;
+        int a;
+        for (a = 0; a < ATOM_COUNT; ++a) {
+            size_t len = strlen(ATOM_STRINGS[a]);
+            if (read + len <= *length &&
+                memcmp(data + read, ATOM_STRINGS[a], len) == 0) {
+                matched = a;
+                mlen = len;
+                break;
+            }
+        }
+        if (matched >= 0) {
+            data[write++] = (unsigned char)(BASE_TOKENS + matched);
+            read += mlen;
+            ++atom_counts[matched];
+        } else {
+            data[write++] = data[read++];
+        }
+    }
+    *length = write;
+}
+
 static void load_text(Text *text)
 {
     unsigned char *raw;
@@ -353,6 +403,7 @@ static void load_text(Text *text)
     normalized = normalize_ascii(raw, raw_length, &text->length);
     clean_editorial_noise(normalized, &text->length,
                           strstr(text->input_path, "crowley") != NULL);
+    apply_atoms(normalized, &text->length);
     text->data = checked_alloc(text->length, sizeof(*text->data));
     for (i = 0; i < text->length; ++i) text->data[i] = normalized[i];
     text->original_length = text->length;
@@ -366,6 +417,9 @@ static int token_contains_newline(int token, const Token *left,
 {
     if (token < BASE_TOKENS) {
         return token == '\n' || token == '\r';
+    }
+    if (token < BASE_TOKENS + ATOM_COUNT) {
+        return 0; /* atomic act-markers never contain newlines */
     }
     if (known[token]) {
         return known[token] == 2;
@@ -411,7 +465,15 @@ static size_t render_token(int token, const Token *left,
                 output[length++] = '.';
             }
         }
-    } else {
+    }
+    if (token < BASE_TOKENS + ATOM_COUNT) {
+        /* reserved atomic act-marker: literal string, never a merge pair */
+        const char *s = ATOM_STRINGS[token - BASE_TOKENS];
+        while (*s && length + 1 < capacity) output[length++] = *s++;
+        output[length] = '\0';
+        return length;
+    }
+    {
         char part[256];
         size_t first = render_token(left[token - BASE_TOKENS], left, right,
                                     part, sizeof(part));
@@ -581,6 +643,14 @@ int main(int argc, char **argv)
         free(texts[i].data);
     }
     printf("saved vocabulary %s\n", vocab_path);
+    printf("atomic act-markers encoded:");
+    {
+        int a;
+        for (a = 0; a < ATOM_COUNT; ++a) {
+            printf(" %s=%llu", ATOM_STRINGS[a], atom_counts[a]);
+        }
+    }
+    printf("\n");
     free(texts);
     return EXIT_SUCCESS;
 }
