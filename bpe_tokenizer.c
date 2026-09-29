@@ -14,18 +14,13 @@
  * retained here so that the trade-off remains explicit and reproducible.
  */
 
-#define BASE_TOKENS 128
-#define MERGE_COUNT 0
-#define MERGE_STORAGE 1
-#define TOKEN_COUNT 128
-#define PAIR_COUNT (TOKEN_COUNT * TOKEN_COUNT)
-
 /*
  * Atomic act-marker tokens (G1): grammar atoms of the record format,
  * matched greedily BEFORE byte splitting.  They are reserved, never learned
- * merges, and never participate in merge scoring (ids >= BASE_TOKENS are
- * skipped by the merge trainer).  Ordered longest-first so the matcher is
- * greedy without ambiguity.
+ * merges, and never participate in merge scoring.  Ordered longest-first so
+ * the matcher is greedy without ambiguity.  Token ids: atoms occupy
+ * BASE_TOKENS..BASE_TOKENS+ATOM_COUNT-1; learned merges (if any) start at
+ * BASE_TOKENS+ATOM_COUNT.
  */
 #define ATOM_COUNT 5
 static const char *ATOM_STRINGS[ATOM_COUNT] = {
@@ -36,6 +31,12 @@ static const char *ATOM_STRINGS[ATOM_COUNT] = {
     "[A",        /* 132 */
 };
 static unsigned long long atom_counts[ATOM_COUNT] = {0};
+
+#define BASE_TOKENS 128
+#define MERGE_COUNT 0
+#define MERGE_STORAGE 1
+#define TOKEN_COUNT (BASE_TOKENS + ATOM_COUNT)
+#define PAIR_COUNT (TOKEN_COUNT * TOKEN_COUNT)
 
 typedef uint16_t Token;
 
@@ -499,7 +500,7 @@ static void learn_merges(Text *texts, int text_count, Token *left,
     for (merge = 0; merge < MERGE_COUNT; ++merge) {
         int text_index;
         int best = -1;
-        int new_token = BASE_TOKENS + merge;
+        int new_token = BASE_TOKENS + ATOM_COUNT + merge;
         memset(scores, 0, PAIR_COUNT * sizeof(*scores));
         memset(totals, 0, PAIR_COUNT * sizeof(*totals));
         for (text_index = 0; text_index < text_count; ++text_index) {
@@ -560,7 +561,7 @@ static void write_vocab(const char *path, const Token *left,
                         const Token *right)
 {
     FILE *file = fopen(path, "wb");
-    uint32_t version = 2;
+    uint32_t version = 3;
     uint32_t count = MERGE_COUNT;
     int i;
     if (file == NULL) fail_path("create", path);
@@ -576,6 +577,22 @@ static void write_vocab(const char *path, const Token *left,
             fwrite(&right[i], sizeof(right[i]), 1, file) != 1) {
             fclose(file);
             fail_path("write", path);
+        }
+    }
+    /* version 3: atomic act-marker table after the merge pairs */
+    {
+        uint32_t atom_count = ATOM_COUNT;
+        if (fwrite(&atom_count, sizeof(atom_count), 1, file) != 1) {
+            fclose(file);
+            fail_path("write", path);
+        }
+        for (i = 0; i < ATOM_COUNT; ++i) {
+            unsigned char length = (unsigned char)strlen(ATOM_STRINGS[i]);
+            if (fwrite(&length, sizeof(length), 1, file) != 1 ||
+                fwrite(ATOM_STRINGS[i], 1, length, file) != length) {
+                fclose(file);
+                fail_path("write", path);
+            }
         }
     }
     if (fclose(file) != 0) fail_path("close", path);
