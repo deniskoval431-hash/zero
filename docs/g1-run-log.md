@@ -65,3 +65,17 @@
   pairs, and quotes record doctrine ("A prediction is not a promise").
   Literary probe stays competent.
 - Verdict: format + facts fusion proven at 4.85M params. G1 gate passed.
+
+
+## Run 4: acts (models/g1_50m_acts.bin) — curriculum genre finding
+- Config: resume 20K, --tokenizer stated, +2.99M act-record tokens (30K core_pairs
+  as [AKIND ~ where ~ who][Z>Aevent]), channel w8, lr 1e-4, +5,000 steps (25K).
+- Val 0.490 (val split now act-dominated — not comparable to polish3's 0.356).
+- Finding: the act genre mattered more than act volume. Event-style records
+  ([A KIND ~ place]) taught record-opening, not Q->A dialog: single-turn Mara
+  recall decayed (model re-opens the channel header instead of answering),
+  while world knowledge grew — turn 3 of the thread test fused the lantern
+  fact with acts material ("the horses starve") in one in-format answer.
+- Keepers: polish3 = conversation model; acts = world-knowledge model.
+- Next: converter v2 — question-shaped [A slots built from core_pair fields,
+  so volume and genre match.
