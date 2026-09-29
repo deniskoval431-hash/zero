@@ -9,8 +9,11 @@
 
 #include "channel_protocol.h"
 
-#ifdef USE_ACCELERATE
+#if defined(USE_ACCELERATE)
 #include <Accelerate/Accelerate.h>
+#elif defined(USE_OPENBLAS)
+#include "cblas.h"
+#define USE_ACCELERATE 1
 #endif
 
 /*
@@ -28,6 +31,8 @@
 #define CHECKPOINT_VERSION 3U
 #define RMS_EPSILON 1.0e-5f
 #define BPE_BASE_TOKENS 128
+#define BPE_ATOM_MAX 32
+#define BPE_ATOM_STRING_MAX 32
 #define BPE_MAX_MERGES (MAX_VOCAB_SIZE - BPE_BASE_TOKENS)
 
 typedef uint16_t Token;
@@ -119,10 +124,13 @@ typedef struct {
 typedef struct {
     int loaded;
     int merge_count;
+    int atom_count;
     int vocab;
     int token_width;
     Token left[BPE_MAX_MERGES];
     Token right[BPE_MAX_MERGES];
+    unsigned char atom_length[BPE_ATOM_MAX];
+    char atom_string[BPE_ATOM_MAX][BPE_ATOM_STRING_MAX];
 } Tokenizer;
 
 typedef struct {
@@ -157,6 +165,7 @@ typedef struct {
     int validation_batches;
     const char *validation_path;
     const char *evaluate_path;
+    const char *warmup_path;
     const char *save_path;
     long save_every;
     const char *resume_path;
@@ -1608,7 +1617,7 @@ static void tokenizer_load(Tokenizer *tokenizer, const char *path)
         !read_items(file, &version, sizeof(version), 1) ||
         !read_items(file, &count, sizeof(count), 1) ||
         memcmp(actual_magic, magic, sizeof(magic)) != 0 ||
-        (version != 1U && version != 2U) ||
+        (version != 1U && version != 2U && version != 3U) ||
         count > BPE_MAX_MERGES || BPE_BASE_TOKENS + count > MAX_VOCAB_SIZE) {
         fclose(file);
         fail("unsupported or corrupt tokenizer");
@@ -1630,18 +1639,44 @@ static void tokenizer_load(Tokenizer *tokenizer, const char *path)
             fclose(file);
             fail("corrupt tokenizer merge table");
         }
-        if (left >= BPE_BASE_TOKENS + i ||
-            right >= BPE_BASE_TOKENS + i) {
+        tokenizer->left[i] = left;
+        tokenizer->right[i] = right;
+    }
+    tokenizer->atom_count = 0;
+    if (version == 3U) {
+        uint32_t atom_count = 0;
+        if (!read_items(file, &atom_count, sizeof(atom_count), 1) ||
+            atom_count > BPE_ATOM_MAX) {
+            fclose(file);
+            fail("corrupt tokenizer atom table");
+        }
+        for (i = 0; i < (int)atom_count; ++i) {
+            unsigned char length = 0;
+            if (!read_items(file, &length, sizeof(length), 1) ||
+                length == 0 || length >= BPE_ATOM_STRING_MAX ||
+                !read_items(file, tokenizer->atom_string[i], 1, length)) {
+                fclose(file);
+                fail("corrupt tokenizer atom table");
+            }
+            tokenizer->atom_string[i][length] = '\0';
+            tokenizer->atom_length[i] = length;
+        }
+        tokenizer->atom_count = (int)atom_count;
+    }
+    for (i = 0; i < (int)count; ++i) {
+        if (tokenizer->left[i] >=
+                BPE_BASE_TOKENS + tokenizer->atom_count + i ||
+            tokenizer->right[i] >=
+                BPE_BASE_TOKENS + tokenizer->atom_count + i) {
             fclose(file);
             fail("invalid tokenizer merge ordering");
         }
-        tokenizer->left[i] = left;
-        tokenizer->right[i] = right;
     }
     if (fclose(file) != 0) fail_path("close tokenizer", path);
     tokenizer->loaded = 1;
     tokenizer->merge_count = (int)count;
-    tokenizer->vocab = BPE_BASE_TOKENS + (int)count;
+    tokenizer->vocab = BPE_BASE_TOKENS + tokenizer->atom_count +
+                       (int)count;
     tokenizer->token_width = version == 1U ? 1 : 2;
 }
 
@@ -1654,15 +1689,35 @@ static size_t tokenizer_encode(const Tokenizer *tokenizer, const char *text,
     size_t length = 0;
     int merge;
     while (read < input_length) {
-        unsigned char value = (unsigned char)text[read++];
-        if (value < BPE_BASE_TOKENS) {
-            tokens[length++] = value;
-        } else {
-            while (read < input_length &&
-                   ((unsigned char)text[read] & 0xc0) == 0x80) {
-                ++read;
+        int matched = -1;
+        size_t mlen = 0;
+        int a;
+        for (a = 0; a < tokenizer->atom_count; ++a) {
+            size_t len = tokenizer->atom_length[a];
+            if (read + len <= input_length &&
+                memcmp(text + read, tokenizer->atom_string[a], len) == 0) {
+                matched = a;
+                mlen = len;
+                break;
             }
-            tokens[length++] = '?';
+        }
+        if (matched >= 0) {
+            tokens[length++] =
+                (Token)(BPE_BASE_TOKENS + matched);
+            read += mlen;
+            continue;
+        }
+        {
+            unsigned char value = (unsigned char)text[read++];
+            if (value < BPE_BASE_TOKENS) {
+                tokens[length++] = value;
+            } else {
+                while (read < input_length &&
+                       ((unsigned char)text[read] & 0xc0) == 0x80) {
+                    ++read;
+                }
+                tokens[length++] = '?';
+            }
         }
     }
     if (tokenizer->loaded) {
@@ -1673,7 +1728,8 @@ static size_t tokenizer_encode(const Tokenizer *tokenizer, const char *text,
                 if (input + 1 < length &&
                     tokens[input] == tokenizer->left[merge] &&
                     tokens[input + 1] == tokenizer->right[merge]) {
-                    tokens[output++] = (Token)(BPE_BASE_TOKENS + merge);
+                    tokens[output++] = (Token)(BPE_BASE_TOKENS +
+                                               tokenizer->atom_count + merge);
                     input += 2;
                 } else {
                     tokens[output++] = tokens[input++];
@@ -1688,14 +1744,24 @@ static size_t tokenizer_encode(const Tokenizer *tokenizer, const char *text,
 
 static void tokenizer_write_token(const Tokenizer *tokenizer, int token)
 {
-    if (!tokenizer->loaded || token < BPE_BASE_TOKENS) {
+    if (tokenizer->loaded && token >= BPE_BASE_TOKENS &&
+        token < BPE_BASE_TOKENS + tokenizer->atom_count) {
+        int index = token - BPE_BASE_TOKENS;
+        fwrite(tokenizer->atom_string[index], 1,
+               tokenizer->atom_length[index], stdout);
+        return;
+    }
+    if (!tokenizer->loaded ||
+        token < BPE_BASE_TOKENS + tokenizer->atom_count) {
         putchar(token);
         return;
     }
     tokenizer_write_token(tokenizer,
-                          tokenizer->left[token - BPE_BASE_TOKENS]);
+                          tokenizer->left[token - BPE_BASE_TOKENS -
+                                          tokenizer->atom_count]);
     tokenizer_write_token(tokenizer,
-                          tokenizer->right[token - BPE_BASE_TOKENS]);
+                          tokenizer->right[token - BPE_BASE_TOKENS -
+                                           tokenizer->atom_count]);
 }
 
 static int candidate_compare(const void *left, const void *right)
@@ -1756,7 +1822,8 @@ static int sample_row(const float *probabilities, float temperature, int top_k,
 
 static void generate(Model *model, const Tokenizer *tokenizer,
                      const char *prompt, long count, float temperature,
-                     int top_k, float repetition_penalty, Rng *rng)
+                     int top_k, float repetition_penalty, Rng *rng,
+                     const Token *warmup, size_t warmup_len)
 {
     Token *context = zero_alloc((size_t)model->cfg.context, sizeof(Token));
     Token *encoded_prompt;
@@ -1766,7 +1833,20 @@ static void generate(Model *model, const Tokenizer *tokenizer,
     size_t i;
     long generated;
 
-    for (i = 0; i < (size_t)model->cfg.context; ++i) context[i] = ' ';
+    /* Condition on real, in-distribution text instead of a blank window.
+     * A context full of spaces is far outside the training distribution and
+     * degenerates sampling; use the tail of the training corpus when available. */
+    if (warmup != NULL && warmup_len >= (size_t)model->cfg.context) {
+        for (i = 0; i < (size_t)model->cfg.context; ++i)
+            context[i] = warmup[warmup_len - (size_t)model->cfg.context + i];
+    } else if (warmup != NULL && warmup_len > 0) {
+        for (i = 0; i < (size_t)model->cfg.context - warmup_len; ++i)
+            context[i] = ' ';
+        for (i = 0; i < warmup_len; ++i)
+            context[(size_t)model->cfg.context - warmup_len + i] = warmup[i];
+    } else {
+        for (i = 0; i < (size_t)model->cfg.context; ++i) context[i] = ' ';
+    }
     for (i = 0; i < encoded_length; ++i) {
         memmove(context, context + 1,
                 ((size_t)model->cfg.context - 1) * sizeof(Token));
@@ -1900,6 +1980,7 @@ static void print_usage(const char *program)
     printf("  --validation N       validation sequences per report (default: 8)\n");
     printf("  --validation-text F  use a separate validation text and all training text\n");
     printf("  --evaluate F         score a text after training or with --steps 0\n");
+    printf("  --warmup F           condition generation on the tail of file F\n");
     printf("  --dropout X          residual dropout probability (default: 0.1)\n");
     printf("  --cosine             cosine-decay the learning rate over this run\n");
     printf("  --best FILE          save each new best-validation checkpoint\n");
@@ -2107,6 +2188,8 @@ int main(int argc, char **argv)
             cfg.layers = (int)parse_long(argv[++i], "--layers");
         } else if (strcmp(argv[i], "--ff") == 0 && i + 1 < argc) {
             cfg.ff = (int)parse_long(argv[++i], "--ff");
+        } else if (strcmp(argv[i], "--vocab") == 0 && i + 1 < argc) {
+            cfg.vocab = (int)parse_long(argv[++i], "--vocab");
         } else if (strcmp(argv[i], "--tokenizer") == 0 && i + 1 < argc) {
             options.tokenizer_path = argv[++i];
         } else if (strcmp(argv[i], "--steps") == 0 && i + 1 < argc) {
@@ -2130,6 +2213,8 @@ int main(int argc, char **argv)
             options.validation_path = argv[++i];
         } else if (strcmp(argv[i], "--evaluate") == 0 && i + 1 < argc) {
             options.evaluate_path = argv[++i];
+        } else if (strcmp(argv[i], "--warmup-file") == 0 && i + 1 < argc) {
+            options.warmup_path = argv[++i];
         } else if (strcmp(argv[i], "--dropout") == 0 && i + 1 < argc) {
             options.dropout = parse_float(argv[++i], "--dropout");
         } else if (strcmp(argv[i], "--cosine") == 0) {
@@ -2468,9 +2553,33 @@ int main(int argc, char **argv)
     }
 
     if (options.generate_tokens > 0) {
-        generate(&model, &tokenizer, options.prompt, options.generate_tokens,
-                 options.temperature, options.top_k,
-                 options.repetition_penalty, &rng);
+        const Token *warmup = NULL;
+        size_t warmup_len = 0;
+        if (options.warmup_path != NULL) {
+            Corpus warm = {0};
+            corpus_add_file(&warm, options.warmup_path,
+                            tokenizer.loaded ? tokenizer.token_width : 1);
+            if (warm.length > 0) {
+                warmup_len = warm.length;
+                if (warmup_len > (size_t)cfg.context)
+                    warmup_len = (size_t)cfg.context;
+                warmup = warm.data + warm.length - warmup_len;
+            }
+            generate(&model, &tokenizer, options.prompt, options.generate_tokens,
+                     options.temperature, options.top_k,
+                     options.repetition_penalty, &rng, warmup, warmup_len);
+            corpus_destroy(&warm);
+        } else {
+            if (corpus.length > 0) {
+                warmup_len = corpus.length;
+                if (warmup_len > (size_t)cfg.context)
+                    warmup_len = (size_t)cfg.context;
+                warmup = corpus.data + corpus.length - warmup_len;
+            }
+            generate(&model, &tokenizer, options.prompt, options.generate_tokens,
+                     options.temperature, options.top_k,
+                     options.repetition_penalty, &rng, warmup, warmup_len);
+        }
     }
 
     corpus_destroy(&corpus);
