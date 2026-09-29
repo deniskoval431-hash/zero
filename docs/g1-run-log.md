@@ -50,3 +50,18 @@
 5. Saturation verdict at 20K: more steps at constant lr = flat curve. The gain
    is in record share (carefully), lr decay, and eventually the 1024-context
    arm on bigger hardware.
+
+
+## Run 3: polish3 (models/g1_50m_polish3.bin) — SUCCESS
+- Config: resume 20K, --tokenizer STATED (the fix), channel weight 12, lr 1e-4,
+  +5,000 steps (25K total), 1,421 s.
+- Val 0.356 at close (val split re-weighted at w12 — compare within-run trend,
+  not across weights; base at w8 read 0.492).
+- Final probes — the record grammar SURFACED:
+  [AWho is Mara? -> "Mara Venn dwells of ... a prediction of dissenting parts
+  holding their ground.] [A>ZWhat is a prediction in the warren?]
+  [Z>A] => A prediction is not a promise. Claims are ..."
+  Model recalls the record entity (Mara Venn), self-sustains [A]/[Z>A act
+  pairs, and quotes record doctrine ("A prediction is not a promise").
+  Literary probe stays competent.
+- Verdict: format + facts fusion proven at 4.85M params. G1 gate passed.
