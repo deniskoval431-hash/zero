@@ -23,6 +23,14 @@
   weight 24 it is dominated by repetitive record templates the model
   memorized. Val loss across runs with different corpus weights is NOT
   comparable. Lesson: keep the evaluation set and its weighting FIXED.
+- ROOT CAUSE FOUND (second postmortem): the polish runs omitted --tokenizer.
+  A --resume restores architecture + weights but NOT the tokenizer; without
+  --tokenizer the uint16 token files are read as raw bytes — exactly 2x the
+  token count (11,482,902 vs 5,802,468), half of them NUL. The model was
+  trained on a ~50% NUL stream: the NUL attractor was fed, not emergent.
+  RETRACTED: "curriculum breaking point at ~50% record share" — weight 24
+  was never validly tested. Fix: always re-state --tokenizer on resume, and
+  check the printed corpus token count against expectation before training.
 
 ## Lessons (the record)
 0. A model can post a beautiful val loss and still be broken — validate on a
