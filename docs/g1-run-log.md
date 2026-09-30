@@ -79,3 +79,20 @@
 - Keepers: polish3 = conversation model; acts = world-knowledge model.
 - Next: converter v2 — question-shaped [A slots built from core_pair fields,
   so volume and genre match.
+
+
+## Run 6: mara_v1 (models/mara_v1.bin) — the keeper speaks
+- Config: resume polish3, --tokenizer stated, warrenvoice_mara_v1 channel
+  (80 authored Q->A records x 40 shuffled reps = 319K tokens) at weight 24,
+  qa_v2 channel w8, g1_records + shakespeare text, lr 1e-4, +4,000 steps
+  (29K total), 1,127 s.
+- Channel format requirements learned: records delimited by protocol tokens
+  (1 start, 7 summary, 2 message, 4 msg-end, 3 reply, 6 target, 5 record-end);
+  each record needs context+1 tokens of runway after its start.
+- Result at 29K: form perfected (closed brackets, <END>, zero literary bleed,
+  zero fabrication — silence where no record), core recall present
+  ("...last lantern lit so the road remembers where the houses were."),
+  but generalization thin: paraphrased/composed questions return silence or
+  question-reflection. 80 verbatim records overfit phrasing, not facts.
+- Verdict: manners perfected, memory narrow. Lever = record variety
+  (paraphrase permutations of the same facts), not volume.
