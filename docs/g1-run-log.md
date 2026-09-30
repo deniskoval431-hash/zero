@@ -136,3 +136,18 @@
 - Decision: browser child frozen on mara_v2 (best talker). Capacity fix
   belongs to the 1024-context / 50M-class CUDA arm — same skeleton, same
   corpus format, re-run not redesign.
+
+
+## Run 10: mara_v5.1 ladder (models/mara_v5_1*.bin) — checkpoint-position sweep
+- Same 62 true pairs, 12x tiles. 1500 steps: val 0.0003 (memorized again).
+- 500-step checkpoint: FLUENT, doctrine-coherent, but self-records still
+  absent ("What is your name?" -> doctrine). 1000-step: stiffening.
+- MEMORIZATION WALL sits between 500-1000 steps at this corpus size.
+- Third independent confirmation of the capacity floor: self-record class
+  never entered ANY checkpoint v1-v5.1. Two walls: exposure->freeze,
+  no-exposure->doctrine wins. 62 pairs = worst spot (minority voice +
+  instant-memorize).
+- SERVED: mara_v5_1@500 (fluent + corrected corpus + ledger). Homepage
+  weights updated, verified 200.
+- Next axis if wanted: curriculum ORDERING (self-records first N steps,
+  then mix) — untried. Otherwise CUDA arm.
