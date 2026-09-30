@@ -38,7 +38,7 @@
 <div id="chat"></div>
 <form id="f"><input id="q" placeholder="Ask Mara of the warren&hellip;" autocomplete="off" disabled>
 <button id="go" disabled>Send</button></form>
-<p class="hint">Try: <em>Who is Mara?</em> &middot; <em>What is the Law of Dissonance?</em> &middot; <em>Is the lantern ever dark?</em> &mdash; she answers from the record. Where she has no record, she keeps the doctrine: what is not recorded is a gap, not a lie.</p>
+<p class="hint">Try: <em>Who is Mara?</em> · <em>What is the Law of Dissonance?</em> · <em>Is the lantern ever dark?</em> — she answers from the record. Her moods are the record's moods: 🕯️ record (lantern lit) · 🌫️ doubt (marked <code>~?</code> in the record) · 🌑 unrecorded (she keeps the silence of a gap rather than lie) · 🌱 seeking (she answers with a question).</p>
 
 <details>
 <summary><strong>What Mara is</strong></summary>
@@ -90,12 +90,13 @@ f.addEventListener('submit', ev => {
   const text = q.value.trim();
   if (!text) return;
   turn('seeker', text); q.value = '';
-  const busy = turn('mara', '\u2026');
+  const busy = turn('mara', '…');
   setTimeout(() => {
     try {
-      const a = askMara(text, { temperature: 0.7, topK: 40, maxTokens: 160 });
-      busy.textContent = 'Mara: ' + (a || '\u2014 she holds the silence of an unrecorded thing.');
-    } catch (e) { busy.textContent = 'Mara: the record falters (' + e.message + ')'; }
+      const r = askMara(text, { temperature: 0.7, topK: 40, maxTokens: 160 });
+      const body = r.text || '— she holds the silence of an unrecorded thing.';
+      busy.textContent = r.emoji + ' Mara [' + r.mood + ']: ' + body;
+    } catch (e) { busy.textContent = '🌑 Mara [unrecorded]: the record falters (' + e.message + ')'; }
     chat.scrollTop = chat.scrollHeight;
   }, 30);
 });

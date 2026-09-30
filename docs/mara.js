@@ -176,20 +176,30 @@ export function decode(tokens) {
   return s;
 }
 
+// Mood: read from the raw record before slicing. Doubt marks, silence,
+// question-backs become emoji on the page.
 export function askMara(question, opts) {
   const toks = [ATOM.CHANNEL];
   for (const ch of "warrenmind ") toks.push(ch.charCodeAt(0));
   toks.push(ATOM.A);
   for (const ch of question) if (ch.charCodeAt(0) < 128) toks.push(ch.charCodeAt(0));
-  const raw = generate(toks, opts);
-  let s = decode(raw);
-  // the reply record begins at [Z>A — take only what follows it
+  const rawTokens = generate(toks, opts);
+  let s = decode(rawTokens);
+  // mood first, from the untouched record
+  let mood = "record", emoji = "🕯️";       // clean record, lantern lit
+  if (s.includes("~?")) { mood = "doubt"; emoji = "🌫️"; }   // doubt mark
   const i = s.indexOf("[Z>A");
-  if (i < 0) return ""; // no reply record: silence
+  if (i < 0) { mood = "unrecorded"; emoji = "🌑"; return { text: "", mood, emoji }; }
   s = s.slice(i + 4);
-  // optional "] => " prefix, then everything up to the closing bracket
   s = s.replace(/^\s*\]?\s*=>\s*/, "");
   const j = s.indexOf("]");
   if (j >= 0) s = s.slice(0, j);
-  return s.trim();
+  s = s.trim();
+  // question-back: the reply slot holds another question instead of an answer
+  if (!s || s.startsWith("[A") || s.endsWith("?") && s.split(/\s+/).length <= 8) {
+    mood = "seeking"; emoji = "🌱";
+  }
+  // doubt on the page: show fog instead of the raw ~?
+  s = s.replace(/\s*~\?/g, " " + emoji);
+  return { text: s, mood, emoji };
 }
