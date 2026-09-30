@@ -96,3 +96,28 @@
   question-reflection. 80 verbatim records overfit phrasing, not facts.
 - Verdict: manners perfected, memory narrow. Lever = record variety
   (paraphrase permutations of the same facts), not volume.
+
+
+## Run 7: mara_v2 (models/mara_v2.bin) — memory is a competition
+- Config: resume polish3, warrenvoice v2 channel (100 pairs: 80 + 20 persona
+  self-records + paraphrases) w24, qa_v2 w8, +5,000 steps (30K total).
+- Result: paraphrase records did NOT take — "What is your name?" (exact case)
+  still returns the doctrine attractor; verified in both JS engine and C
+  binary. Minor gain: "Are you AI?" returns silence (no-invention holds).
+- Diagnosis: small-model memory is a COMPETITION, not a warehouse. New
+  records at equal weight are out-competed by doctrine records reinforced
+  across all channels. Exposure must be budgeted like compute.
+- mara_v3 launched: self-records at 4x tile frequency, qa_v2 weight 8->4.
+
+
+## Run 8: mara_v3 (models/mara_v3.bin) — exposure lever failed
+- Config: resume polish3, v3 channel (self-records 4x tile), qa_v2 w4,
+  +5,000 steps (30K total).
+- Result: self-records STILL not learned; literary drift returned. Two
+  consecutive curriculum-mass failures => the lever is not record frequency.
+  Physics: ~1M effective params vs 6.2M-token corpus, literary streams hold
+  ~90% of gradient at 5K steps. Memory is washed, not stacked.
+- mara_v4 launched: CHANNEL-ONLY distillation (no --text streams,
+  warrenvoice w24 + qa_v2 w6, 3,000 steps). All lantern, no Shakespeare.
+- Structural conclusion if v4 fails: 4.85M params holds ONE record-set;
+  real capacity waits on the 1024-context / 50M-class arm.
