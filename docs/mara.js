@@ -183,7 +183,7 @@ function tokenize(q) {
 }
 export function retrieve(ledger, question, k = 1) {
   const qw = tokenize(question);
-  if (!qw.size) return [];
+  if (!qw.length) return [];
   const scored = ledger.map(rec => {
     const rw = tokenize(rec.q);
     let hit = 0;

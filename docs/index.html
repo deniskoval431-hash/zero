@@ -68,7 +68,8 @@ gcc -O3 -DUSE_OPENBLAS -I. -o literary_lm_blas.exe literary_lm.c -lopenblas
 </details>
 
 <script type="module">
-import { loadWeights, askMara } from './mara.js';
+import { loadWeights, askMaraRAG } from './mara.js';
+import { LEDGER } from './mara_ledger.js';
 const bar = document.getElementById('bar'), msg = document.getElementById('loadmsg'),
       chat = document.getElementById('chat'), q = document.getElementById('q'),
       go = document.getElementById('go'), f = document.getElementById('f');
@@ -93,9 +94,17 @@ f.addEventListener('submit', ev => {
   const busy = turn('mara', '…');
   setTimeout(() => {
     try {
-      const r = askMara(text, { temperature: 0.7, topK: 40, maxTokens: 160 });
+      const r = askMaraRAG(text, LEDGER, { temperature: 0.7, topK: 40, maxTokens: 160 });
       const body = r.text || '— she holds the silence of an unrecorded thing.';
       busy.textContent = r.emoji + ' Mara [' + r.mood + ']: ' + body;
+      if (r.source) {
+        const src = document.createElement('div');
+        src.className = 'turn';
+        src.style.color = '#8f8672';
+        src.style.fontSize = '.85rem';
+        src.textContent = '📖 the record reads: [' + r.source.q + '] ' + r.source.a;
+        chat.appendChild(src);
+      }
     } catch (e) { busy.textContent = '🌑 Mara [unrecorded]: the record falters (' + e.message + ')'; }
     chat.scrollTop = chat.scrollHeight;
   }, 30);
