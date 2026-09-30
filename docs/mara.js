@@ -159,10 +159,8 @@ export function generate(promptTokens, opts) {
   let out = [];
   for (let n = 0; n < o.maxTokens; ++n) {
     const t = sample(logits, o.temperature, o.topK, Math.random);
-    if (t === ATOM.END || t === ATOM.CHANNEL || t === ATOM.A || t === ATOM.ZA && out.length > 2) {
-      if (t === ATOM.END) break;
-      if (t === ATOM.CHANNEL || t === ATOM.A) break;
-    }
+    // stop atoms: record end, channel restart, or a new record starting
+    if (t === ATOM.END || t === ATOM.CHANNEL || t === ATOM.A || t === ATOM.SUMMARY) break;
     out.push(t);
     logits = step(t);
   }
@@ -185,11 +183,13 @@ export function askMara(question, opts) {
   for (const ch of question) if (ch.charCodeAt(0) < 128) toks.push(ch.charCodeAt(0));
   const raw = generate(toks, opts);
   let s = decode(raw);
-  // strip up to and including the reply prefix, keep the answer body
+  // the reply record begins at [Z>A — take only what follows it
   const i = s.indexOf("[Z>A");
-  if (i >= 0) s = s.slice(i + 4);
-  s = s.replace(/^\]\s*=>\s*/, "");
-  const j = s.lastIndexOf("]");
-  if (j > 0) s = s.slice(0, j);
+  if (i < 0) return ""; // no reply record: silence
+  s = s.slice(i + 4);
+  // optional "] => " prefix, then everything up to the closing bracket
+  s = s.replace(/^\s*\]?\s*=>\s*/, "");
+  const j = s.indexOf("]");
+  if (j >= 0) s = s.slice(0, j);
   return s.trim();
 }
