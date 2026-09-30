@@ -121,3 +121,18 @@
   warrenvoice w24 + qa_v2 w6, 3,000 steps). All lantern, no Shakespeare.
 - Structural conclusion if v4 fails: 4.85M params holds ONE record-set;
   real capacity waits on the 1024-context / 50M-class arm.
+
+
+## Run 9: mara_v4 (models/mara_v4.bin) — capacity floor reached
+- Config: resume polish3, CHANNEL-ONLY (warrenvoice v3 w24 + qa_v2 w6),
+  3,000 steps (28K total), 810 s. Val collapsed 0.096 -> 0.028 (corpus
+  memorized) but generation DEGRADED: fused records, no clean reply slots.
+- Ladder complete: v1 form-ok/memory-narrow, v2 paraphrase-fail,
+  v3 exposure-fail, v4 distill-fail. Five checkpoints on one wall.
+- STRUCTURAL CONCLUSION: 4.85M params hold ONE record-set. New facts
+  cannot enter by training mass at this scale. Grammar held throughout
+  (format, moods, no-invention); capacity is the floor. The grammar grew
+  to the edge of its soil.
+- Decision: browser child frozen on mara_v2 (best talker). Capacity fix
+  belongs to the 1024-context / 50M-class CUDA arm — same skeleton, same
+  corpus format, re-run not redesign.
