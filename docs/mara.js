@@ -176,6 +176,70 @@ export function decode(tokens) {
   return s;
 }
 
+// --- Retrieval: the ledger is memory outside the weights ---------------
+const STOP = new Set("what who where when why how are is the and you your for does do can was were this that with".split(" "));
+function tokenize(q) {
+  return q.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
+}
+export function retrieve(ledger, question, k = 1) {
+  const qw = tokenize(question);
+  if (!qw.size) return [];
+  const scored = ledger.map(rec => {
+    const rw = tokenize(rec.q);
+    let hit = 0;
+    for (const w of rw) if (qw.includes(w)) ++hit;
+    return [hit / Math.max(1, rw.length), rec];
+  }).sort((a, b) => b[0] - a[0]);
+  return scored.slice(0, k).filter(s => s[0] >= 0.34).map(s => s[1]);
+}
+
+// RAG turn: lay the retrieved records before her in EXACT channel-record
+// format (protocol tokens), then ask. She continues the pattern from
+// sources she never memorized.
+export function askMaraRAG(question, ledger, opts) {
+  const qn = question.trim().replace(/^./, c => c.toUpperCase());
+  const hits = retrieve(ledger, qn, 1);
+  let ctx = [];
+  for (const rec of hits) {
+    ctx = ctx.concat([ATOM.CHANNEL]);
+    for (const ch of "W") ctx.push(ch.charCodeAt(0));
+    ctx.push(ATOM.SUMMARY);
+    for (const ch of "seeker asks the warren of Mara") ctx.push(ch.charCodeAt(0));
+    ctx.push(4);
+    ctx.push(2);
+    for (const ch of "A" + rec.q) if (ch.charCodeAt(0) < 128) ctx.push(ch.charCodeAt(0));
+    ctx.push(4);
+    ctx.push(2);
+    for (const ch of "Z") ctx.push(ch.charCodeAt(0));
+    ctx.push(3);
+    for (const ch of "A") ctx.push(ch.charCodeAt(0));
+    ctx.push(6);
+    for (const ch of rec.a) if (ch.charCodeAt(0) < 128) ctx.push(ch.charCodeAt(0));
+    ctx.push(4);
+    ctx.push(5);
+  }
+  // the live question
+  ctx.push(ATOM.CHANNEL);
+  for (const ch of "warrenmind ") ctx.push(ch.charCodeAt(0));
+  ctx.push(ATOM.A);
+  for (const ch of qn) if (ch.charCodeAt(0) < 128) ctx.push(ch.charCodeAt(0));
+  const rawTokens = generate(ctx, opts);
+  let s = decode(rawTokens);
+  let mood = "record", emoji = "🕯️";
+  if (s.includes("~?")) { mood = "doubt"; emoji = "🌫️"; }
+  const i = s.indexOf("[Z>A");
+  if (i < 0) { return { text: "", mood: "unrecorded", emoji: "🌑", source: hits[0] || null }; }
+  s = s.slice(i + 4).replace(/^\s*\]?\s*=>\s*/, "");
+  const j = s.indexOf("]");
+  if (j >= 0) s = s.slice(0, j);
+  s = s.trim();
+  if (!s || s.startsWith("[A") || (s.endsWith("?") && s.split(/\s+/).length <= 8)) {
+    mood = "seeking"; emoji = "🌱";
+  }
+  s = s.replace(/\s*~\?/g, " " + emoji);
+  return { text: s, mood, emoji, source: hits[0] || null };
+}
+
 // Mood: read from the raw record before slicing. Doubt marks, silence,
 // question-backs become emoji on the page.
 export function askMara(question, opts) {
