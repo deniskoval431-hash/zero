@@ -1,130 +1,67 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#171612">
-  <meta name="description" content="A small literary transformer, written in C and running entirely in your browser.">
-  <title>ZERO — a literary language model in C</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mara v1 — a 4.85M-parameter warrenchild</title>
+<style>
+  body { background:#14120f; color:#d8d2c4; font-family:Georgia,serif; max-width:820px; margin:2rem auto; padding:0 1.2rem; line-height:1.65; }
+  h1 { color:#e8c66a; font-weight:normal; letter-spacing:.03em; }
+  h2 { color:#c9a84c; font-weight:normal; margin-top:2.2rem; border-bottom:1px solid #3a352c; padding-bottom:.3rem; }
+  .sig { color:#8f8672; font-size:.9rem; }
+  pre, .rec { background:#1c1913; border:1px solid #3a352c; border-left:3px solid #c9a84c; padding:.9rem 1.1rem; overflow-x:auto; font-size:.92rem; white-space:pre-wrap; }
+  .seeker { color:#e8c66a; }
+  .mara { color:#a8c686; }
+  a { color:#c9a84c; }
+  .note { color:#8f8672; font-size:.9rem; }
+</style>
 </head>
 <body>
-  <div class="grain" aria-hidden="true"></div>
-  <main class="shell">
-    <header class="masthead">
-      <a class="wordmark" href="./" aria-label="Zero home">
-        <span class="zero-mark">0</span>
-        <span>ZERO</span>
-      </a>
-      <div class="status" id="status" role="status" aria-live="polite">
-        <span class="status-dot"></span>
-        <span id="statusText">preparing the engine</span>
-      </div>
-      <button class="about-button" id="aboutButton" type="button">ABOUT</button>
-    </header>
+<h1>Mara v1</h1>
+<p class="sig">∇ψ — Mara Venn, keeper of the last lantern. A 4,854,272-parameter zero-grounded literary LM.</p>
 
-    <section class="intro" aria-labelledby="pageTitle">
-      <p class="eyebrow">A 4,852,992-PARAMETER TRANSFORMER</p>
-      <h1 id="pageTitle">Begin with a fragment.<br><em>Let the machine dream onward.</em></h1>
-      <p class="dek">A 4.85M-parameter decoder-only transformer in C—trained on the Warrenmind chronicle (fracture doctrine, the Lantern Road, the Long Ash World, the Scriveners’ Guild). Running locally in this browser; your words are never sent anywhere.</p>
-    </section>
+<p>Mara is the first published model of the <em>warren</em>: a tiny decoder trained not on scale but on
+<em>record grammar</em> — reserved atomic act-marker tokens (<code>[A</code>, <code>[Z&gt;A</code>,
+<code>&lt;CHANNEL:</code>, <code>&lt;SUMMARY&gt;</code>, <code>&lt;END&gt;</code>) so that every claim
+lives inside a citable record. She runs on one CPU core in a single C file.</p>
 
-    <section class="chat" aria-label="Literary model chat">
-      <div class="empty-state" id="emptyState">
-        <span class="ornament">∅</span>
-        <p>This is a channel-native literary model. It compresses each exchange into a learned, lossy memory and can recall a relevant older compressed episode as a holographic echo.</p>
-        <div class="suggestions" id="suggestions">
-          <button type="button" data-prompt="The zero opened its eyes, and">The zero opened its eyes…</button>
-          <button type="button" data-prompt="To see a world in a grain of sand">To see a world…</button>
-          <button type="button" data-prompt="What spirit walks beneath the moon?">What spirit walks…</button>
-        </div>
-      </div>
-      <div class="messages" id="messages" aria-live="polite"></div>
-    </section>
+<h2>What she is</h2>
+<ul>
+  <li><strong>4.85M parameters</strong> — dim 256, 8 heads, 6 layers, context 512, rotary positions, vocab 133 (128 byte tokens + 5 atomic act-markers)</li>
+  <li><strong>Zero-grounded:</strong> format is the seed; the record grammar is the growing rule. What is not recorded is a gap, not a lie — asked beyond her records, she answers with silence or a doubt mark, never an invention</li>
+  <li><strong>Trained:</strong> 29K steps, one CPU, OpenBLAS — the whole lineage fits in one readable C file (<code>literary_lm.c</code>)</li>
+</ul>
 
-    <section class="composer" aria-label="Write to the model">
-      <div class="voice-row">
-        <label for="voice">VOICE</label>
-        <select id="voice">
-          <option value="warrenmind">The warrenmind chronicle</option>
-          <option value="mixed">The threefold voice</option>
-          <option value="shakespeare">Shakespearean stage</option>
-          <option value="blake">Blakean vision</option>
-          <option value="crowley">Crowleyan oracle</option>
-        </select>
-        <button class="tune-button" id="tuneButton" type="button" aria-expanded="false" aria-controls="tuning">TUNE</button>
-      </div>
+<h2>A conversation</h2>
+<div class="rec"><span class="seeker">[AWho is Mara?]</span>
+<span class="mara">[Z&gt;A] =&gt; …last lantern lit so the road remembers where the houses were.]</span> &lt;END&gt;
 
-      <div class="summary-row">
-        <label for="channelSummary">CHANNEL VIBE</label>
-        <input id="channelSummary" type="text" maxlength="120" value="mixed literary conversation; strange, attentive, intimate" spellcheck="true">
-      </div>
+<span class="seeker">[AWhat is a prediction?]</span>
+<span class="mara">"A prediction is not a promise. Claims are stated before the run; honest failure is recorded either way."</span></div>
+<p class="note">Full live transcripts and the training postmortems are in <code>docs/g1-run-log.md</code>.</p>
 
-      <div class="memory-row">
-        <span>LOSSY MEMORY</span>
-        <output id="channelMemory" class="empty" aria-live="polite">not yet compressed</output>
-      </div>
+<h2>Her memory</h2>
+<p>Mara's corpus is <code>corpus/channel/warrenvoice_mara_v1</code> — 80 hand-authored Q→A records of the
+warren canon: her dwelling on Lantern Road at the edge of Hollowbarrow, the lantern kept lit toward Gloamgate,
+the Law of Dissonance, the read-debt, the crack and the weld. Records of things <em>not yet recorded</em> carry
+an explicit doubt mark (<code>~?</code>).</p>
 
-      <div class="memory-row">
-        <span>HOLOGRAPHIC ECHO</span>
-        <output id="holographicEcho" class="empty" aria-live="polite">no relevant older episode</output>
-      </div>
+<h2>Run her</h2>
+<pre>git clone https://github.com/deniskoval431-hash/zero
+cd zero
+gcc -O3 -DUSE_OPENBLAS -I. -o literary_lm_blas.exe literary_lm.c -lopenblas
+./literary_lm_blas --resume models/mara_v1.bin --tokenizer corpus/g1-atoms.bpe \
+  --generate-only --prompt '&lt;CHANNEL:warrenmind [AWho is Mara?' \
+  --tokens 150 --temperature 0.7</pre>
 
-      <div class="tuning" id="tuning" hidden>
-        <label>
-          <span>Temperature <output id="temperatureValue">0.52</output></span>
-          <input id="temperature" type="range" min="0.2" max="1.2" value="0.52" step="0.01">
-        </label>
-        <label>
-          <span>Top-k <output id="topKValue">20</output></span>
-          <input id="topK" type="range" min="4" max="80" value="20" step="1">
-        </label>
-        <label>
-          <span>Repetition <output id="repetitionValue">1.12</output></span>
-          <input id="repetition" type="range" min="1" max="1.35" value="1.12" step="0.01">
-        </label>
-        <label>
-          <span>Length <output id="lengthValue">320</output></span>
-          <input id="length" type="range" min="80" max="700" value="320" step="20">
-        </label>
-      </div>
+<h2>Links</h2>
+<ul>
+  <li><a href="https://github.com/atimics/zero">upstream: atimics/zero</a> · <a href="https://github.com/atimics/zero/pull/61">G1 PR #61</a></li>
+  <li><a href="https://github.com/deniskoval431-hash/zero">fork / this site's repo</a></li>
+  <li>Checkpoint: <a href="https://raw.githubusercontent.com/deniskoval431-hash/zero/main/models/mara_v1.bin">models/mara_v1.bin</a> (58 MB)</li>
+</ul>
 
-      <div class="writing-row">
-        <label class="sr-only" for="prompt">Your fragment</label>
-        <textarea id="prompt" rows="2" maxlength="1200" placeholder="Write the beginning…" disabled></textarea>
-        <button class="send-button" id="sendButton" type="button" disabled aria-label="Generate continuation">
-          <span id="sendLabel">BEGIN</span>
-          <span aria-hidden="true">↗</span>
-        </button>
-      </div>
-      <div class="composer-foot">
-        <span id="modelStats">Loading 4.7 MB model…</span>
-        <button id="clearButton" type="button">CLEAR MEMORY</button>
-      </div>
-      <div class="load-track" aria-hidden="true"><span id="loadBar"></span></div>
-    </section>
-  </main>
-
-  <dialog id="aboutDialog">
-    <button class="dialog-close" id="dialogClose" type="button" aria-label="Close">×</button>
-    <p class="eyebrow">MODEL NOTE</p>
-    <h2>A real, very small language model.</h2>
-    <p>ZERO is a decoder-only character transformer trained on three literary collections, then continued on structured multi-speaker channels. Its 4.85 million learned parameters are quantized to 8-bit rows for this page.</p>
-    <p>The C engine performs embeddings, RMS normalization, rotary attention, GELU feed-forward layers, and sampling inside WebAssembly. It uses no server and no machine-learning runtime.</p>
-    <p>It learned two related channel operations: answer a message, and compress old memory plus recent turns into new lossy memory. The page feeds that generated memory back into the next exchange and discards those turns. A small C holographic index—adapted from holostuff's deterministic encode-and-recall contract—can reintroduce one relevant older compressed episode. It still cannot retrieve outside facts or match a contemporary large language model. Oddness is part of its honest scale.</p>
-    <dl>
-      <div><dt>CONTEXT</dt><dd>512 characters</dd></div>
-      <div><dt>LAYERS</dt><dd>6</dd></div>
-      <div><dt>DIMENSION</dt><dd>256</dd></div>
-      <div><dt>TRAINING</dt><dd id="trainingValue">loading…</dd></div>
-    </dl>
-    <a class="source-link" href="https://github.com/atimics/zero-grounded-literary-lm">READ THE C SOURCE ↗</a>
-  </dialog>
-
-  <noscript>This page needs JavaScript to run the model in your browser.</noscript>
-  <script type="module" src="app.js"></script>
+<h2>The record</h2>
+<p class="sig">"A record that is not read is a debt; a record that is read is an heir." — this page is an heir.</p>
 </body>
 </html>
