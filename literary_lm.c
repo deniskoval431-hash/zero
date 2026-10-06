@@ -2522,8 +2522,19 @@ int main(int argc, char **argv)
             }
             if (options.save_path != NULL && options.save_every > 0 &&
                 update % (uint64_t)options.save_every == 0) {
-                checkpoint_save(options.save_path, &model, update, &rng);
-                printf("saved %s\n", options.save_path);
+                /* periodic checkpoints go to a step-suffixed path so they
+                 * never overwrite the canonical --save final checkpoint
+                 * (bug found in the wb_phase3 run: --save-every clobbered
+                 * --save, losing all mid-run checkpoints) */
+                size_t sp_len = strlen(options.save_path);
+                char step_path[1024];
+                if (sp_len + 64 >= sizeof(step_path)) {
+                    fail("--save path too long for step-suffixed checkpoint");
+                }
+                snprintf(step_path, sizeof(step_path), "%s.step%llu",
+                         options.save_path, (unsigned long long)update);
+                checkpoint_save(step_path, &model, update, &rng);
+                printf("saved %s\n", step_path);
             }
             }
             free(loss_mask);
