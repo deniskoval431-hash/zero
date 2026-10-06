@@ -1,0 +1,23 @@
+loaded tokenizer wb_phase3.vocab
+literary_lm: backend=Accelerate context=512 vocab=133 dim=256 heads=8 layers=6 ff=1056 positions=rotary parameters=4854272
+corpus=337301 tokens train=320380 validation=16921 tokens/update=512 sampling=weighted-files-and-channel-records
+update      250 train 1.9057 val 0.6900 grad 3.122 lr 0.000298906 tok/s 1211
+update      500 train 0.3392 val 0.3442 grad 1.224 lr 0.00029228 tok/s 1108
+update      750 train 0.2242 val 0.2996 grad 0.554 lr 0.000279904 tok/s 1098
+update     1000 train 0.2019 val 0.2963 grad 0.745 lr 0.000262277 tok/s 1081
+update     1250 train 0.2115 val 0.2902 grad 0.711 lr 0.000240111 tok/s 1088
+update     1500 train 0.1934 val 0.2781 grad 1.500 lr 0.000214304 tok/s 1070
+update     1750 train 0.2091 val 0.2779 grad 0.767 lr 0.000185897 tok/s 1066
+update     2000 train 0.1920 val 0.2669 grad 0.442 lr 0.00015604 tok/s 1047
+saved wb_phase3_armB.f32
+update     2250 train 0.1815 val 0.2669 grad 0.456 lr 0.000125938 tok/s 1063
+update     2500 train 0.1849 val 0.2647 grad 0.377 lr 9.68093e-05 tok/s 1049
+update     2750 train 0.1881 val 0.2633 grad 0.897 lr 6.98301e-05 tok/s 1050
+update     3000 train 0.1843 val 0.2718 grad 0.344 lr 4.60913e-05 tok/s 1048
+update     3250 train 0.1840 val 0.2640 grad 0.611 lr 2.65524e-05 tok/s 1064
+update     3500 train 0.1853 val 0.2636 grad 0.743 lr 1.20031e-05 tok/s 1045
+update     3750 train 0.1724 val 0.2647 grad 0.607 lr 3.03141e-06 tok/s 1054
+update     4000 train 0.1801 val 0.2644 grad 0.696 lr 0 tok/s 1044
+saved wb_phase3_armB.f32
+training time 1911.47 seconds
+saved wb_phase3_armB.f32
