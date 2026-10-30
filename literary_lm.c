@@ -2126,6 +2126,12 @@ int main(int argc, char **argv)
     double interval_loss = 0.0;
     long interval_sequences = 0;
     long completed_steps = 0;
+    /* cosine schedule span: absolute update count at which decay reaches zero.
+     * On --resume, `update` is restored from the checkpoint, so the schedule
+     * CONTINUES from the resumed position instead of restarting mid-ramp
+     * (bug found in the g1 runs: resumed --cosine runs reheated the learning
+     * rate to full because progress was computed from a per-run counter). */
+    uint64_t cosine_total = 0;
     float best_validation = INFINITY;
     long stale_reports = 0;
     int stop_training = 0;
@@ -2302,6 +2308,10 @@ int main(int argc, char **argv)
         printf("resumed %s at update %llu\n", options.resume_path,
                (unsigned long long)update);
     }
+    /* --steps on resume means ADDITIONAL steps (documented convention), so the
+     * cosine span ends at update + steps: lr continues descending from the
+     * resumed point and reaches ~0 at the end of this segment. */
+    cosine_total = update + (uint64_t)options.steps;
 
 #ifdef USE_ACCELERATE
     printf("literary_lm: backend=Accelerate");
@@ -2456,11 +2466,11 @@ int main(int argc, char **argv)
             if (options.warmup > 0 && update < (uint64_t)options.warmup) {
                 current_lr *= (float)update / options.warmup;
             }
-            if (options.cosine_decay && options.steps > options.warmup &&
-                completed_steps > options.warmup) {
+            if (options.cosine_decay && cosine_total > (uint64_t)options.warmup &&
+                update > (uint64_t)options.warmup) {
                 float progress =
-                    (float)(completed_steps - options.warmup) /
-                    (float)(options.steps - options.warmup);
+                    (float)(update - (uint64_t)options.warmup) /
+                    (float)(cosine_total - (uint64_t)options.warmup);
                 const float pi = 3.14159265358979323846f;
                 if (progress > 1.0f) progress = 1.0f;
                 current_lr *= 0.5f * (1.0f + cosf(pi * progress));
